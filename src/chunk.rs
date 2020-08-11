@@ -6,8 +6,13 @@ pub enum OpCode {
     Return,
 }
 
+pub struct CodeLine {
+    pub code: OpCode,
+    pub line: i32,
+}
+
 pub struct Chunk {
-    pub code: Vec<OpCode>,
+    pub code: Vec<CodeLine>,
     pub constants: ValueArray,
 }
 
@@ -19,7 +24,7 @@ impl Chunk {
         }
     }
     
-    pub fn write_chunk(&mut self, code: OpCode) -> () {
-        self.code.push(code)
+    pub fn write_chunk(&mut self, code: OpCode, line: i32) -> () {
+        self.code.push(CodeLine {code, line})
     }
 }
