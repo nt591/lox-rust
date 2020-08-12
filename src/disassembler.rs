@@ -22,9 +22,11 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> () {
     match instruction {
         OpCode::Return => simple_instruction("OP_RETURN".to_string()),
         OpCode::Constant(constant) => constant_instruction("OP_CONSTANT".to_string(), *constant),
-        _ => {
-            println!("Unknown opcode {:?}\n", instruction);
-        }
+        OpCode::Negate => simple_instruction("OP_NEGATE".to_string()),
+        OpCode::Add => simple_instruction("OP_ADD".to_string()),
+        OpCode::Subtract => simple_instruction("OP_SUBTRACT".to_string()),
+        OpCode::Multiply => simple_instruction("OP_MULTIPLY".to_string()),
+        OpCode::Divide => simple_instruction("OP_DIVIDE".to_string()),
     }
 }
 
