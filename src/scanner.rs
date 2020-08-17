@@ -6,7 +6,7 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    pub fn new(source: String) -> Scanner {
+    pub fn new(source: &String) -> Scanner {
         let chars = source.chars().collect();
         Scanner {
             source: chars,
@@ -65,7 +65,7 @@ impl Scanner {
                     self.make_token(TokenType::Greater)
                 }
             },
-            '=' => self.string(),
+            '"' => self.string(),
             ch if self.is_digit(ch) => self.number(),
             ch if self.is_alpha(ch) => self.identifier(),
             _ => self.error_token("Unexpected character.".to_string())
@@ -81,6 +81,7 @@ impl Scanner {
             token_type,
             line: self.line,
             lexeme: self.source[self.start..self.current].iter().collect(),
+            start: self.start,
         }
     }
 
@@ -88,7 +89,8 @@ impl Scanner {
         Token {
             token_type: TokenType::Error,
             lexeme: message,
-            line: self.line
+            line: self.line,
+            start: self.start,
         }
     }
 
@@ -257,13 +259,15 @@ impl Scanner {
     }
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub line: i32,
+    pub start: usize,
     pub lexeme: String
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TokenType {
     // single characters
     LeftParen, RightParen,
@@ -288,5 +292,8 @@ pub enum TokenType {
 
     Error, 
     EOF,
+
+    // starting place 
+    _Default,
 }
 

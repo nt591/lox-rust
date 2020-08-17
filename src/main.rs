@@ -10,30 +10,11 @@ mod vm;
 
 fn main() {
     let mut vm = vm::VM::new();
-    /*
-     * let mut chunk = chunk::Chunk::new_chunk();
-    
-    chunk.write_chunk(chunk::OpCode::Constant(1.2), 123);
-    chunk.write_chunk(chunk::OpCode::Constant(3.4), 123);
-    chunk.write_chunk(chunk::OpCode::Add, 123);
-
-    chunk.write_chunk(chunk::OpCode::Constant(5.6), 123);
-    chunk.write_chunk(chunk::OpCode::Divide, 123);
-    chunk.write_chunk(chunk::OpCode::Negate,123);
-    
-    chunk.write_chunk(chunk::OpCode::Return, 123);
-
-    let name = String::from("test chunk");
-    disassembler::disassemble_chunk(chunk.clone(), name);
-    vm.interpret(chunk);
-    println!("done!");
-    */
-
     let args: Vec<String> = env::args().collect();
 
     match args.len() {
-        1 => repl(),
-        2 => match run_file(&args[1]) {
+        1 => repl(&mut vm),
+        2 => match run_file(&args[1], &mut vm) {
             Err(_) => {
                 eprintln!("Invalid file at {}", args[1]);
                 std::process::exit(74);
@@ -47,12 +28,7 @@ fn main() {
     }
 }
 
-fn interpret(source: String) -> vm::InterpretResult {
-    compiler::compile(source);
-    vm::InterpretResult::Ok
-}
-
-fn repl() -> () {
+fn repl(machine: &mut vm::VM) -> () {
     loop {
        let mut input = String::new();
 
@@ -65,15 +41,15 @@ fn repl() -> () {
             }
         }
 
-        interpret(input.clone());
+        machine.interpret(&input);
     }
 }
 
-fn run_file(path: &String) -> std::io::Result<()> {
+fn run_file(path: &String, machine: &mut vm::VM) -> std::io::Result<()> {
     let mut buffer = String::new();
     let mut f = std::fs::File::open(path)?;
     f.read_to_string(&mut buffer)?;
-    let result : vm::InterpretResult = interpret(buffer);
+    let result : vm::InterpretResult = machine.interpret(&buffer);
 
     match result {
         vm::InterpretResult::CompileError => std::process::exit(65),

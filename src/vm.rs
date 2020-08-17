@@ -1,10 +1,12 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::value::Value;
+use crate::compiler::Compiler;
 
 pub struct VM {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    compiler: Compiler,
 }
 
 pub enum InterpretResult {
@@ -18,12 +20,19 @@ impl VM {
         VM {
             chunk: Chunk::new_chunk(),
             ip: 0, 
-            stack: Vec::new(), 
+            stack: Vec::new(),
+            compiler: Compiler::new(),
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
+    pub fn interpret(&mut self, source: &String) -> InterpretResult {
+        let chunk = Chunk::new_chunk();
+        if self.compiler.compile(&source, &chunk) {
+            return InterpretResult::CompileError
+        }
+
         self.chunk = chunk;
+
         self.run()
     }
     
@@ -51,7 +60,7 @@ impl VM {
                 OpCode::Negate => {
                     match self.stack.pop() {
                         Some(val) => self.stack.push(val * -1.0),
-                        None => println!("Error popping"),
+                        None => eprintln!("Error popping"),
                     }
                 }
                 

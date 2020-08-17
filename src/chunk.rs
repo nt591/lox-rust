@@ -1,6 +1,5 @@
 use crate::value::Value;
 
-
 #[derive(Debug, Clone, Copy)]
 pub enum OpCode {
     Constant(Value),
@@ -32,7 +31,7 @@ impl Chunk {
         }
     }
     
-    pub fn write_chunk(&mut self, code: OpCode, line: i32) -> () {
+    pub fn write(&mut self, code: OpCode, line: i32) -> () {
         self.code.push(CodeLine {code, line})
     }
 }
