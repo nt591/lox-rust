@@ -58,13 +58,13 @@ impl VM {
                 OpCode::Add | 
                     OpCode::Subtract |
                     OpCode:: Multiply | 
-                    OpCode:: Divide => self.binary_operation(instruction.clone())
+                    OpCode:: Divide => self.binary_operation(&instruction)
 
             }
         }
     }
 
-    pub fn binary_operation(&mut self, operator: OpCode) -> () {
+    fn binary_operation(&mut self, operator: &OpCode) -> () {
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
         match operator {
