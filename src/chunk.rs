@@ -11,13 +11,13 @@ pub enum OpCode {
     Negate,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CodeLine {
     pub code: OpCode,
     pub line: i32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Chunk {
     pub code: Vec<CodeLine>,
     pub constants: Vec<Value>,

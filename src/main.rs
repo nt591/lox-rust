@@ -1,5 +1,6 @@
+#![feature(const_fn)] 
 use std::env;
-use std::io::Read;
+use std::io::{Read, Write};
 
 mod compiler;
 mod chunk;
@@ -11,7 +12,6 @@ mod vm;
 fn main() {
     let mut vm = vm::VM::new();
     let args: Vec<String> = env::args().collect();
-
     match args.len() {
         1 => repl(&mut vm),
         2 => match run_file(&args[1], &mut vm) {
@@ -29,18 +29,19 @@ fn main() {
 }
 
 fn repl(machine: &mut vm::VM) -> () {
-    loop {
-       let mut input = String::new();
-
+   loop {
         print!("> ");
-        match std::io::stdin().read_to_string(&mut input) {
+        std::io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        let expression = std::io::stdin().read_line(&mut input);
+        match expression {
             Ok(_) => (),
             Err(_) => {
-                println!();
-                break;
+                println!("Error!");
+               break;
             }
         }
-
         machine.interpret(&input);
     }
 }

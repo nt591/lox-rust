@@ -1,5 +1,7 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::value::{Value};
+
+#[allow(dead_code)]
 pub fn disassemble_chunk(chunk: Chunk, name: String) -> () {
     println!("== {} ==\n", name);
     let list = chunk.code.iter();

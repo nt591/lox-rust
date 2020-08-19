@@ -6,7 +6,6 @@ pub struct VM {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
-    compiler: Compiler,
 }
 
 pub enum InterpretResult {
@@ -21,17 +20,17 @@ impl VM {
             chunk: Chunk::new_chunk(),
             ip: 0, 
             stack: Vec::new(),
-            compiler: Compiler::new(),
         }
     }
 
     pub fn interpret(&mut self, source: &String) -> InterpretResult {
-        let chunk = Chunk::new_chunk();
-        if self.compiler.compile(&source, &chunk) {
+        self.chunk = Chunk::new_chunk();
+        self.ip = 0; // we need to reset pointer to start of char vector
+        let mut compiler = Compiler::new(&mut self.chunk);
+
+        if !compiler.compile(&source) {
             return InterpretResult::CompileError
         }
-
-        self.chunk = chunk;
 
         self.run()
     }
@@ -48,7 +47,6 @@ impl VM {
                         Some(val) => {
                             println!("{:?}", val);
                             break InterpretResult::Ok
-
                         },
                         None => {
                             println!("Error: Nothing to return");

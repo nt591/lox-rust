@@ -30,25 +30,55 @@ impl Parser {
     }
 }
 
-pub struct Compiler {
-    scanner: Scanner,
-    chunk: Chunk,
-    parser: Parser,
-    compiling_chunk: Chunk,
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+enum Precedence {
+    None,
+    Assignment,
+    Or,
+    And,
+    Equality,
+    Comparison,
+    Term,
+    Factor,
+    Unary,
+    Call,
+    Primary,
 }
 
-impl Compiler {
+impl Precedence {
+    fn next_rule(parse_rule: ParseRule) -> Precedence {
+        match parse_rule.precedence {
+            Precedence::None => Precedence::Assignment,
+            Precedence::Assignment => Precedence::Or,
+            Precedence::Or => Precedence::And,
+            Precedence::And => Precedence::Equality,
+            Precedence::Equality => Precedence::Comparison,
+            Precedence::Comparison => Precedence::Term,
+            Precedence::Term => Precedence::Factor,
+            Precedence::Factor => Precedence::Unary,
+            Precedence::Unary => Precedence::Call,
+            Precedence::Call => Precedence::Primary,
+            Precedence::Primary => panic!("No matching rule higher than Primary"),
+        }
+    }
+}
 
-    pub fn new() -> Compiler {
+pub struct Compiler<'a> {
+    scanner: Scanner,
+    parser: Parser,
+    compiling_chunk: &'a mut Chunk,
+}
+
+impl Compiler<'_> {
+    pub fn new(chunk: &mut Chunk) -> Compiler {
         Compiler {
             scanner: Scanner::new(&"".to_string()),
-            chunk: Chunk::new_chunk(),
             parser: Parser::new(),
-            compiling_chunk: Chunk::new_chunk()
+            compiling_chunk: chunk,
         }
     }
 
-    pub fn compile(&mut self,source: &String, chunk: &Chunk) -> bool {
+    pub fn compile(&mut self,source: &String) -> bool {
         self.scanner = Scanner::new(&source);
         self.reset_error_state();
         self.advance();
@@ -116,6 +146,23 @@ impl Compiler {
     fn end_compiler(&mut self) -> () {
         self.emit_return();
     }
+    
+    fn get_rule(&self, op_type: TokenType) -> ParseRule {
+        RULES[op_type as usize] 
+    }
+
+    fn binary(&mut self) -> () {
+        let op_type : TokenType = self.parser.previous.token_type;
+        let rule : ParseRule = self.get_rule(op_type);
+        self.parse_precedence(Precedence::next_rule(rule));
+        match op_type {
+            TokenType::Plus => self.emit_byte(OpCode::Add),
+            TokenType::Minus => self.emit_byte(OpCode::Subtract),
+            TokenType::Star => self.emit_byte(OpCode::Multiply),
+            TokenType::Slash => self.emit_byte(OpCode::Divide),
+            _ => (),
+        }
+    }
 
     fn number(&mut self) -> () {
         let value = self.parser.previous.lexeme.parse::<Value>().unwrap();
@@ -129,15 +176,33 @@ impl Compiler {
 
     fn unary(&mut self) -> () {
         let last_seen_type = self.parser.previous.token_type;
-        self.expression();
+        self.parse_precedence(Precedence::Unary);
         match last_seen_type {
             TokenType::Minus => self.emit_byte(OpCode::Negate),
             _ => (),
         }
     }
+    
+    fn parse_precedence(&mut self, precedence: Precedence) -> () {
+        self.advance();
+        let prefix_rule : Option<ParserFunction> = self.get_rule(self.parser.previous.token_type).prefix;
+        match prefix_rule {
+            None => self.error("Expect expression."),
+            Some(parse_fn) => parse_fn(self),
+        }
 
-    fn expression(&self) -> () {
-        
+        while precedence <= self.get_rule(self.parser.current.token_type).precedence {
+            self.advance();
+            let infix_rule : Option<ParserFunction> = self.get_rule(self.parser.previous.token_type).infix;
+            match infix_rule {
+                None => self.error("Unexpected call to infix rule"),
+                Some(infix_fn) => infix_fn(self),
+            }
+        }
+    }
+
+    fn expression(&mut self) -> () {
+        self.parse_precedence(Precedence::Assignment);    
     }
 
     fn emit_return(&mut self) -> () {
@@ -148,4 +213,95 @@ impl Compiler {
         self.emit_byte(OpCode::Constant(value));
     }
 }
+
+/*
+ * boilerplate setup for the parse precedence
+ */
+
+type ParserFunction = fn(&mut Compiler) -> ();
+
+#[derive(Copy, Clone)]
+struct ParseRule {
+    infix: Option<ParserFunction>,
+    prefix: Option<ParserFunction>,
+    precedence: Precedence,
+}
+
+impl ParseRule {
+    const fn infix(infix: ParserFunction, precedence: Precedence) -> ParseRule {
+        ParseRule {
+            infix: Some(infix),
+            precedence,
+            prefix: None,
+        }
+    }
+    
+    const fn prefix(prefix: ParserFunction, precedence: Precedence) -> ParseRule {
+        ParseRule {
+            infix: None,
+            prefix: Some(prefix),
+            precedence,
+        }
+    }
+
+    const fn both(prefix: ParserFunction, infix: ParserFunction, precedence: Precedence) -> ParseRule {
+        ParseRule {
+            infix: Some(infix),
+            prefix: Some(prefix),
+            precedence,
+        }
+    }
+
+    const fn neither() -> ParseRule {
+        ParseRule {
+            infix: None,
+            prefix: None,
+            precedence: Precedence::None,
+        }
+    }
+}
+
+// maps are heap allocated so this is faster
+const RULES : [ParseRule; 40] = [
+    ParseRule::prefix(|compiler| compiler.grouping(), Precedence::None), //left paren
+    ParseRule::neither(), //right paren
+    ParseRule::neither(), //left brace
+    ParseRule::neither(), //right brace
+    ParseRule::neither(), // comma
+    ParseRule::neither(), // dot
+    ParseRule::both(|compiler| compiler.unary(), |compiler| compiler.binary(), Precedence::Term), // minus
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Term), //plus
+    ParseRule::neither(), //semicolon
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Factor), //slash
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Factor), //star
+    ParseRule::neither(), // bang
+    ParseRule::neither(), //bang equal
+    ParseRule::neither(), //equal
+    ParseRule::neither(), //equal equal
+    ParseRule::neither(), // greater
+    ParseRule::neither(), //greater equal
+    ParseRule::neither(), //less
+    ParseRule::neither(), //less equal
+    ParseRule::neither(), //identifier
+    ParseRule::neither(), //string
+    ParseRule::prefix(|compiler| compiler.number(), Precedence::None), // number
+    ParseRule::neither(), // and
+    ParseRule::neither(), // class
+    ParseRule::neither(), // else
+    ParseRule::neither(), // false
+    ParseRule::neither(), // for
+    ParseRule::neither(), // fun
+    ParseRule::neither(), // if
+    ParseRule::neither(), // nil
+    ParseRule::neither(), // or
+    ParseRule::neither(), // print
+    ParseRule::neither(), // return
+    ParseRule::neither(), // super
+    ParseRule::neither(), // this 
+    ParseRule::neither(), // true
+    ParseRule::neither(), // var
+    ParseRule::neither(), // while
+    ParseRule::neither(), // error 
+    ParseRule::neither(), // eof
+];
 

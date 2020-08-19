@@ -3,16 +3,20 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: i32,
+    len: usize,
 }
 
 impl Scanner {
     pub fn new(source: &String) -> Scanner {
-        let chars = source.chars().collect();
+        let chars: Vec<char> = source.chars().collect();
+        let len: usize = chars.len();
+
         Scanner {
             source: chars,
             start: 0,
             current: 0,
             line: 1,
+            len,
         }
     }
 
@@ -73,7 +77,7 @@ impl Scanner {
     }
 
     pub fn is_at_end(&self) -> bool {
-        self.source[self.current] == '\0'
+        self.current >= self.len || self.source[self.current] == '\0'
     }
 
     fn make_token(&self, token_type: TokenType) -> Token {
@@ -247,7 +251,11 @@ impl Scanner {
     }
 
     fn peek(&self) -> char {
-        self.source[self.current]
+        if self.is_at_end() {
+            '\0'
+        } else {
+            self.source[self.current]
+        }
     }
 
     fn peek_next(&self) -> char {
