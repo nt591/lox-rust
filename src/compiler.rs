@@ -139,6 +139,11 @@ impl Compiler<'_> {
         self.compiling_chunk.write(code, self.parser.previous.line);
     }
 
+    fn emit_bytes(&mut self, code1: OpCode, code2: OpCode) -> () {
+        self.emit_byte(code1);
+        self.emit_byte(code2);
+    }
+
     //fn current_chunk(&self) -> Chunk {
       //  self.compiling_chunk
     //}
@@ -160,13 +165,29 @@ impl Compiler<'_> {
             TokenType::Minus => self.emit_byte(OpCode::Subtract),
             TokenType::Star => self.emit_byte(OpCode::Multiply),
             TokenType::Slash => self.emit_byte(OpCode::Divide),
+            TokenType::BangEqual => self.emit_bytes(OpCode::Equal, OpCode::Not),
+            TokenType::EqualEqual => self.emit_byte(OpCode::Equal),
+            TokenType::Greater => self.emit_byte(OpCode::Greater),
+            TokenType::GreaterEqual => self.emit_bytes(OpCode::Less, OpCode::Not),
+            TokenType::Less => self.emit_byte(OpCode::Less),
+            TokenType::LessEqual => self.emit_bytes(OpCode::Greater, OpCode::Not),
+            _ => (),
+        }
+    }
+
+    fn literal(&mut self) -> () {
+        match self.parser.previous.token_type {
+            TokenType::False => self.emit_byte(OpCode::False),
+            TokenType::True => self.emit_byte(OpCode::True),
+            TokenType::Nil => self.emit_byte(OpCode::Nil),
             _ => (),
         }
     }
 
     fn number(&mut self) -> () {
-        let value = self.parser.previous.lexeme.parse::<Value>().unwrap();
-        self.emit_constant(value);
+        let value = self.parser.previous.lexeme.parse::<f64>().unwrap();
+        let val = Value::number_val(value);
+        self.emit_constant(val);
     }
 
     fn grouping(&mut self) -> () {
@@ -178,6 +199,7 @@ impl Compiler<'_> {
         let last_seen_type = self.parser.previous.token_type;
         self.parse_precedence(Precedence::Unary);
         match last_seen_type {
+            TokenType::Bang => self.emit_byte(OpCode::Not),
             TokenType::Minus => self.emit_byte(OpCode::Negate),
             _ => (),
         }
@@ -186,11 +208,12 @@ impl Compiler<'_> {
     fn parse_precedence(&mut self, precedence: Precedence) -> () {
         self.advance();
         let prefix_rule : Option<ParserFunction> = self.get_rule(self.parser.previous.token_type).prefix;
+        
         match prefix_rule {
             None => self.error("Expect expression."),
             Some(parse_fn) => parse_fn(self),
         }
-
+        
         while precedence <= self.get_rule(self.parser.current.token_type).precedence {
             self.advance();
             let infix_rule : Option<ParserFunction> = self.get_rule(self.parser.previous.token_type).infix;
@@ -274,31 +297,31 @@ const RULES : [ParseRule; 40] = [
     ParseRule::neither(), //semicolon
     ParseRule::infix(|compiler| compiler.binary(), Precedence::Factor), //slash
     ParseRule::infix(|compiler| compiler.binary(), Precedence::Factor), //star
-    ParseRule::neither(), // bang
-    ParseRule::neither(), //bang equal
+    ParseRule::prefix(|compiler| compiler.unary(), Precedence::None), // bang
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Equality), //bang equal
     ParseRule::neither(), //equal
-    ParseRule::neither(), //equal equal
-    ParseRule::neither(), // greater
-    ParseRule::neither(), //greater equal
-    ParseRule::neither(), //less
-    ParseRule::neither(), //less equal
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Equality), //equal equal
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), // greater
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), //greater equal
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), //less
+    ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), //less equal
     ParseRule::neither(), //identifier
     ParseRule::neither(), //string
     ParseRule::prefix(|compiler| compiler.number(), Precedence::None), // number
     ParseRule::neither(), // and
     ParseRule::neither(), // class
     ParseRule::neither(), // else
-    ParseRule::neither(), // false
+    ParseRule::prefix(|compiler| compiler.literal(), Precedence::None), // false
     ParseRule::neither(), // for
     ParseRule::neither(), // fun
     ParseRule::neither(), // if
-    ParseRule::neither(), // nil
+    ParseRule::prefix(|compiler| compiler.literal(), Precedence::None), // nil
     ParseRule::neither(), // or
     ParseRule::neither(), // print
     ParseRule::neither(), // return
     ParseRule::neither(), // super
     ParseRule::neither(), // this 
-    ParseRule::neither(), // true
+    ParseRule::prefix(|compiler| compiler.literal(), Precedence::None), // true
     ParseRule::neither(), // var
     ParseRule::neither(), // while
     ParseRule::neither(), // error 

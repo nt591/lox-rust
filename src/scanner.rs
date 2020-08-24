@@ -199,9 +199,8 @@ impl Scanner {
 
     fn check_keyword(&self, start: usize, length: usize, rest: &str, token_type: TokenType) -> TokenType {
         let start_idx : usize = self.start + start;
-        let end_idx : usize = start_idx + length + 1;
+        let end_idx : usize = start_idx + length;
         let substr : String = self.source[start_idx..end_idx].into_iter().collect();
-        
         if (self.current - self.start == start + length) 
             && substr == rest {
             token_type    

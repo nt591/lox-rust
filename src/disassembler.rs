@@ -22,20 +22,27 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> () {
         print!("{:04} ", line);
     } 
     match instruction {
-        OpCode::Return => simple_instruction("OP_RETURN".to_string()),
-        OpCode::Constant(constant) => constant_instruction("OP_CONSTANT".to_string(), *constant),
-        OpCode::Negate => simple_instruction("OP_NEGATE".to_string()),
-        OpCode::Add => simple_instruction("OP_ADD".to_string()),
-        OpCode::Subtract => simple_instruction("OP_SUBTRACT".to_string()),
-        OpCode::Multiply => simple_instruction("OP_MULTIPLY".to_string()),
-        OpCode::Divide => simple_instruction("OP_DIVIDE".to_string()),
+        OpCode::Return => simple_instruction("OP_RETURN"),
+        OpCode::Constant(constant) => constant_instruction("OP_CONSTANT", constant),
+        OpCode::Negate => simple_instruction("OP_NEGATE"),
+        OpCode::Add => simple_instruction("OP_ADD"),
+        OpCode::Subtract => simple_instruction("OP_SUBTRACT"),
+        OpCode::Multiply => simple_instruction("OP_MULTIPLY"),
+        OpCode::Divide => simple_instruction("OP_DIVIDE"),
+        OpCode::Nil => simple_instruction("OP_NIL"),
+        OpCode::True => simple_instruction("OP_TRUE"),
+        OpCode::False => simple_instruction("OP_FALSE"),
+        OpCode::Not => simple_instruction("OP_NOT"),
+        OpCode::Equal => simple_instruction("OP_EQUAL"),
+        OpCode::Greater => simple_instruction("OP_GREATER"),
+        OpCode::Less => simple_instruction("OP_LESS"),
     }
 }
 
-fn simple_instruction(name: String) -> () {
+fn simple_instruction(name: &str) -> () {
     println!("{}", name);
 }
 
-fn constant_instruction(name: String, constant: Value) -> () {
-    println!("{} {:16}",name, constant);
+fn constant_instruction(name: &str, constant: &Value) -> () {
+    println!("{} {}",name, constant);
 } 
