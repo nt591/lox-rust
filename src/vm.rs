@@ -107,10 +107,19 @@ impl VM {
     }
 
     fn binary_operation(&mut self, operator: &OpCode) -> Result<(), InterpretResult> {
-        if !Value::is_number(&self.peek(0)) || !Value::is_number(&self.peek(0)) {
-            self.runtime_error("Operands must be numbers");
-            Err(InterpretResult::RuntimeError)
-        } else {
+        // handle string concat separately
+        if Value::is_string(&self.peek(0)) && Value::is_string(&self.peek(1)) {
+            match operator {
+                OpCode::Add => {
+                    self.concatenate();
+                    Ok(())
+                },
+                _ => {
+                    self.runtime_error("Invalid operator for strings");
+                    Err(InterpretResult::RuntimeError)
+                }
+            }
+        } else if Value::is_number(&self.peek(0)) && Value::is_number(&self.peek(0)) {
             let b = Value::as_number(self.stack.pop().unwrap());
             let a = Value::as_number(self.stack.pop().unwrap());
             match operator {
@@ -121,7 +130,17 @@ impl VM {
                 _ => panic!("{} is not a binary operation", operator),
             }
             Ok(())
+        } else {
+            self.runtime_error("Operands must be both numbers or strings");
+            Err(InterpretResult::RuntimeError)
         }
+    }
+
+    fn concatenate(&mut self) -> () {
+        let b = Value::as_string(self.stack.pop().unwrap());
+        let mut a = Value::as_string(self.stack.pop().unwrap());
+        a.push_str(&b);
+        self.stack.push(Value::string_val(a));
     }
 
     fn binary_comparison(&mut self, operator: &OpCode) -> Result<(), InterpretResult> {

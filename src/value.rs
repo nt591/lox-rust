@@ -26,6 +26,12 @@ impl Value {
 		}
 	}
 
+        pub fn string_val(val: String) -> Value {
+            Value {
+                value_type: ValueType::String(val)
+            }
+        }
+
         pub fn nil_val() -> Value {
             Value {
                 value_type: ValueType::Nil
@@ -88,6 +94,7 @@ impl Value {
                 (ValueType::Bool(a_val), ValueType::Bool(b_val)) => a_val == b_val,
                 (ValueType::Nil, ValueType::Nil) => true,
                 (ValueType::Number(a_val), ValueType::Number(b_val)) => a_val == b_val,
+                (ValueType::String(s), ValueType::String(a)) => a == s,
                 _ => false,
             }
         }
@@ -96,10 +103,12 @@ impl Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.value_type {
+        let val = self.value_type.clone();
+        match val {
             ValueType::Number(v) => write!(f, "{}", v),
             ValueType::Bool(v) => write!(f, "{}", v),
             ValueType::Nil => write!(f, "Nil"),
+            ValueType::String(s) => write!(f, "\"{}\"", s),
         }
     }
 }

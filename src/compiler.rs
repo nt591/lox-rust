@@ -190,6 +190,14 @@ impl Compiler<'_> {
         self.emit_constant(val);
     }
 
+    fn string(&mut self) {
+        let lexeme = self.parser.previous.lexeme.parse::<String>().unwrap();
+        let len = lexeme.len();
+        let value = &lexeme[1..len - 1];
+        let val = Value::string_val(value.to_string());
+        self.emit_constant(val);
+    }
+
     fn grouping(&mut self) -> () {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
@@ -306,7 +314,7 @@ const RULES : [ParseRule; 40] = [
     ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), //less
     ParseRule::infix(|compiler| compiler.binary(), Precedence::Comparison), //less equal
     ParseRule::neither(), //identifier
-    ParseRule::neither(), //string
+    ParseRule::prefix(|compiler| compiler.string(), Precedence::None), //string
     ParseRule::prefix(|compiler| compiler.number(), Precedence::None), // number
     ParseRule::neither(), // and
     ParseRule::neither(), // class
