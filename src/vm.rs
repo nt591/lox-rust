@@ -39,7 +39,7 @@ impl VM {
         loop {
             let ip = self.ip;
             self.ip += 1;
-            let instruction = self.chunk.code[ip].code;
+            let instruction = self.chunk.code[ip].code.clone();
             match instruction {
                 OpCode::Return => {
                     match self.stack.pop() {
@@ -58,8 +58,8 @@ impl VM {
                 OpCode::True => self.stack.push(Value::bool_val(true)),
                 OpCode::False => self.stack.push(Value::bool_val(false)),
                 OpCode::Negate => {
-                    match self.peek(0) {
-                        val if !Value::is_number(val) => {
+                    match &self.peek(0) {
+                        val if !Value::is_number(&val) => {
                             self.runtime_error("Operand must be a number");
                             break InterpretResult::RuntimeError
                         },
@@ -74,7 +74,7 @@ impl VM {
                         self.runtime_error("No value to pop from stack");
                         break InterpretResult::RuntimeError
                     },
-                    Some(val) => self.stack.push(Value::bool_val(Value::is_falsey(val))),
+                    Some(val) => self.stack.push(Value::bool_val(Value::is_falsey(&val))),
                 },
                 OpCode::Equal => {
                     let b: Value = self.stack.pop().unwrap();
@@ -102,12 +102,12 @@ impl VM {
         }
     }
 
-    fn peek(&self, distance: usize) -> Value {
-        self.stack[self.stack.len() - 1 - distance]
+    fn peek(&self, distance: usize) -> &Value {
+        &self.stack[self.stack.len() - 1 - distance]
     }
 
     fn binary_operation(&mut self, operator: &OpCode) -> Result<(), InterpretResult> {
-        if !Value::is_number(self.peek(0)) || !Value::is_number(self.peek(0)) {
+        if !Value::is_number(&self.peek(0)) || !Value::is_number(&self.peek(0)) {
             self.runtime_error("Operands must be numbers");
             Err(InterpretResult::RuntimeError)
         } else {
@@ -125,7 +125,7 @@ impl VM {
     }
 
     fn binary_comparison(&mut self, operator: &OpCode) -> Result<(), InterpretResult> {
-        if !Value::is_number(self.peek(0)) || !Value::is_number(self.peek(0)) {
+        if !Value::is_number(&self.peek(0)) || !Value::is_number(&self.peek(0)) {
             self.runtime_error("Operands must be numbers");
             Err(InterpretResult::RuntimeError)
         } else {

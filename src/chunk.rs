@@ -1,7 +1,7 @@
 use std::fmt;
 use crate::value::Value;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum OpCode {
     Constant(Value),
     True,

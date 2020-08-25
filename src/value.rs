@@ -1,13 +1,14 @@
 use std::fmt;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum ValueType {
 	Bool(bool),
 	Nil,
 	Number(f64),
+        String(String),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Value {
 	value_type: ValueType,
 }
@@ -41,29 +42,44 @@ impl Value {
 	pub fn as_number(val: Value) -> f64 {
 		match val.value_type {
 			ValueType::Number(val) => val,
-			_ => panic!("Value::as_bool should never be called on a non-bool type")
+			_ => panic!("Value::as_number should never be called on a non-f64 type")
 		}
 	}
 
-        pub fn is_number(val: Value) -> bool {
+        pub fn as_string(val: Value) -> String {
+            match val.value_type {
+                ValueType::String(string) => string,
+                _ => panic!("Value::as_string should never be called on non-string"),
+            }
+        }
+
+        pub fn is_number(val: &Value) -> bool {
             match val.value_type {
                 ValueType::Number(_) => true,
                 _ => false,
             }
         }
 
-        pub fn is_bool(val: Value) -> bool {
+        pub fn is_bool(val: &Value) -> bool {
             match val.value_type {
                 ValueType::Bool(_) => true,
                 _ => false,
             }
         }
 
-        pub fn is_falsey(val: Value) -> bool {
+        pub fn is_string(val: &Value) -> bool {
+            match val.value_type {
+                ValueType::String(_) => true,
+                _ => false,
+            }
+        }
+
+        pub fn is_falsey(val: &Value) -> bool {
             match val.value_type {
                 ValueType::Nil => true,
                 ValueType::Bool(bool_val) => !bool_val,
                 ValueType::Number(_) => false,
+                ValueType::String(_) => false,
             }
         }
 
@@ -75,6 +91,7 @@ impl Value {
                 _ => false,
             }
         }
+
 }
 
 impl fmt::Display for Value {
