@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::chunk::{Chunk, OpCode};
 use crate::value::Value;
 use crate::compiler::Compiler;
@@ -6,6 +8,7 @@ pub struct VM {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    globals: HashMap<String, Value>,
 }
 
 pub enum InterpretResult {
@@ -20,6 +23,7 @@ impl VM {
             chunk: Chunk::new_chunk(),
             ip: 0, 
             stack: Vec::new(),
+            globals: HashMap::new(),
         }
     }
 
@@ -39,9 +43,16 @@ impl VM {
         loop {
             let ip = self.ip;
             self.ip += 1;
+            // handle overflow
+            if ip >= self.chunk.code.len() {
+                return InterpretResult::Ok
+            }
+
             let instruction = self.chunk.code[ip].code.clone();
             match instruction {
-                OpCode::Return => {
+                OpCode::Return => (),
+                /*
+                 * OpCode::Return => {
                     match self.stack.pop() {
                         Some(val) => {
                             println!("{}", val);
@@ -53,6 +64,8 @@ impl VM {
                         }
                     }
                 },
+                */
+                OpCode::Print => println!("{}", self.stack.pop().unwrap()),
                 OpCode::Constant(val) => self.stack.push(val),
                 OpCode::Nil => self.stack.push(Value::nil_val()),
                 OpCode::True => self.stack.push(Value::bool_val(true)),
@@ -82,6 +95,33 @@ impl VM {
                     self.stack.push(Value::bool_val(Value::values_equal(a, b)));
                 },
                 
+                OpCode::Pop => {
+                    self.stack.pop();
+                },
+                OpCode::DefineGlobal(val) => {
+                    self.globals.insert(val, self.peek(0).clone());
+                    self.stack.pop();
+                }
+                OpCode::GetGlobal(val) => {
+                    let value = self.globals.get(&val);
+                    if let Some(v) = value {
+                        self.stack.push(v.clone());
+                    } else {
+                        self.runtime_error(&format!("Undefined variable {}", val));
+                        return InterpretResult::RuntimeError;
+                    }
+                }
+
+                OpCode::SetGlobal(val) => {
+                    // setting a variable that's been previously declared
+                    // first make sure the variable exists
+                    if self.globals.contains_key(&val) {
+                        self.globals.insert(val, self.peek(0).clone());
+                    } else {
+                        self.runtime_error(&format!("Undefined variable {}", val));
+                        return InterpretResult::RuntimeError;
+                    }
+                }
                 // todo - consolidate with binary_operation
                 OpCode::Greater | OpCode::Less => {
                     match self.binary_comparison(&instruction) {

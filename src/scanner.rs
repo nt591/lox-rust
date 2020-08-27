@@ -72,7 +72,7 @@ impl Scanner {
             '"' => self.string(),
             ch if self.is_digit(ch) => self.number(),
             ch if self.is_alpha(ch) => self.identifier(),
-            _ => self.error_token("Unexpected character.".to_string())
+            ch => self.error_token(format!("Unexpected character {:?}", ch))
         }
     }
 
@@ -225,16 +225,13 @@ impl Scanner {
     fn skip_whitespace(&mut self) -> () {
         loop {
             let c: char = self.peek();
-
             match c {
                 ' ' | '\r' | '\t' => {
                     self.advance();
-                    break;
                 },
                 '\n' => {
                     self.line += 1;
                     self.advance();
-                    break;
                 },
                 '/' => {
                     if self.peek_next() == '/' {
@@ -242,7 +239,6 @@ impl Scanner {
                             self.advance();
                         }    
                     }
-                    break ();
                 }
                 _ => break (),
             }

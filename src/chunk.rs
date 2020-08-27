@@ -4,8 +4,12 @@ use crate::value::Value;
 #[derive(Clone)]
 pub enum OpCode {
     Constant(Value),
+    DefineGlobal(String),
+    GetGlobal(String),
+    SetGlobal(String),
     True,
     False,
+    Pop,
     Nil,
     Add,
     Subtract,
@@ -14,6 +18,7 @@ pub enum OpCode {
     Return,
     Not,
     Negate,
+    Print,
     Equal,
     Greater,
     Less,
@@ -23,8 +28,12 @@ impl fmt::Display for OpCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             OpCode::Constant(val) => write!(f, "{}", val),
+            OpCode::DefineGlobal(val) => write!(f, "{}", val),
+            OpCode::GetGlobal(val) => write!(f, "{}", val),
+            OpCode::SetGlobal(val) => write!(f, "{}", val),
             OpCode::True => write!(f, "OpCode::True"),
             OpCode::False => write!(f, "OpCode::False"),
+            OpCode::Pop => write!(f, "OpCode::Pop"),
             OpCode::Nil => write!(f, "OpCode::Nil"),
             OpCode::Add => write!(f, "OpCode::Add"),
             OpCode::Subtract => write!(f, "OpCode::Subtract"),
@@ -36,6 +45,7 @@ impl fmt::Display for OpCode {
             OpCode::Equal => write!(f, "OpCode::Equal"),
             OpCode::Less => write!(f, "OpCode::Less"),
             OpCode::Greater => write!(f, "OpCode::Greater"),
+            OpCode::Print => write!(f, ""),
         }
     }
 }

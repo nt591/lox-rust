@@ -1,0 +1,5 @@
+var breakfast = "cheerios";
+var modifier = "honey nut";
+breakfast = modifier + " " + breakfast;
+
+print breakfast;

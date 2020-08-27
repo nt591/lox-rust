@@ -24,6 +24,9 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> () {
     match instruction {
         OpCode::Return => simple_instruction("OP_RETURN"),
         OpCode::Constant(constant) => constant_instruction("OP_CONSTANT", constant),
+        OpCode::DefineGlobal(val) => global_instruction("OP_DEFINE_GLOBAL", val),
+        OpCode::GetGlobal(val) => global_instruction("OP_GET_GLOBAL", val),
+        OpCode::SetGlobal(val) => global_instruction("OP_SET_GLOBAL", val),
         OpCode::Negate => simple_instruction("OP_NEGATE"),
         OpCode::Add => simple_instruction("OP_ADD"),
         OpCode::Subtract => simple_instruction("OP_SUBTRACT"),
@@ -36,11 +39,17 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> () {
         OpCode::Equal => simple_instruction("OP_EQUAL"),
         OpCode::Greater => simple_instruction("OP_GREATER"),
         OpCode::Less => simple_instruction("OP_LESS"),
+        OpCode::Print => simple_instruction("OP_PRINT"),
+        OpCode::Pop => simple_instruction("OP_POP"),
     }
 }
 
 fn simple_instruction(name: &str) -> () {
     println!("{}", name);
+}
+
+fn global_instruction(name: &str, constant: &String) -> () {
+    println!("{} {}",name, constant);
 }
 
 fn constant_instruction(name: &str, constant: &Value) -> () {
