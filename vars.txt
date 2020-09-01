@@ -3,3 +3,17 @@ var modifier = "honey nut";
 breakfast = modifier + " " + breakfast;
 
 print breakfast;
+
+var x = 3;
+x = x * 10;
+
+print x;
+
+var l = "outside scope";
+
+{
+  var l = "inside scope";
+  print l;
+}
+
+print l;

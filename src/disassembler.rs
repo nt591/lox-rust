@@ -27,6 +27,8 @@ fn disassemble_instruction(chunk: &Chunk, offset: usize) -> () {
         OpCode::DefineGlobal(val) => global_instruction("OP_DEFINE_GLOBAL", val),
         OpCode::GetGlobal(val) => global_instruction("OP_GET_GLOBAL", val),
         OpCode::SetGlobal(val) => global_instruction("OP_SET_GLOBAL", val),
+        OpCode::GetLocal(val) => local_instruction("OP_GET_LOCAL", val),
+        OpCode::SetLocal(val) => local_instruction("OP_SET_LOCAL", val),
         OpCode::Negate => simple_instruction("OP_NEGATE"),
         OpCode::Add => simple_instruction("OP_ADD"),
         OpCode::Subtract => simple_instruction("OP_SUBTRACT"),
@@ -55,3 +57,8 @@ fn global_instruction(name: &str, constant: &String) -> () {
 fn constant_instruction(name: &str, constant: &Value) -> () {
     println!("{} {}",name, constant);
 } 
+
+fn local_instruction(name: &str, constant: &usize) -> () {
+    println!("{} {}",name, constant);
+}
+

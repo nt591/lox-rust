@@ -122,6 +122,15 @@ impl VM {
                         return InterpretResult::RuntimeError;
                     }
                 }
+
+                OpCode::GetLocal(val) => {
+                    self.stack.push(self.stack[val].clone());
+                }
+
+                OpCode::SetLocal(val) => {
+                    self.stack[val] = self.peek(0).clone();
+                }
+
                 // todo - consolidate with binary_operation
                 OpCode::Greater | OpCode::Less => {
                     match self.binary_comparison(&instruction) {

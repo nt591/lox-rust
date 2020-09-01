@@ -63,10 +63,20 @@ impl Precedence {
     }
 }
 
+#[derive(Clone)]
+struct Local {
+    name: String,
+    depth: usize,
+    initialized: bool,
+}
+
 pub struct Compiler<'a> {
     scanner: Scanner,
     parser: Parser,
     compiling_chunk: &'a mut Chunk,
+    
+    scope_depth: usize,
+    locals: Vec<Local>,
 }
 
 impl Compiler<'_> {
@@ -75,6 +85,8 @@ impl Compiler<'_> {
             scanner: Scanner::new(&"".to_string()),
             parser: Parser::new(),
             compiling_chunk: chunk,
+            locals: Vec::new(),
+            scope_depth: 0,
         }
     }
 
@@ -103,11 +115,40 @@ impl Compiler<'_> {
         }
     }
 
+    fn block(&mut self) -> () {
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::EOF) {
+            // keep eating up every line up to semicolons as declarations
+            self.declaration();
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}'  after block.");
+    }
+
     fn statement(&mut self) -> () {
         if self.match_token(TokenType::Print) {
             self.print_statement();
-        } else {
+        } else if self.match_token(TokenType::LeftBrace) {
+            // open brace means new block scope
+            self.begin_scope();
+            self.block();
+            self.end_scope();
+        } else { 
             self.expression_statement();
+        }
+    }
+
+    fn begin_scope(&mut self) -> () {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) -> () {
+        self.scope_depth -= 1;
+
+        // pop locals vector until we get rid of all of the old scope values
+        // that is, anything with a value greater than current scope depth needs to die
+        while self.locals.len() > 0 && self.locals.last().unwrap().depth > self.scope_depth {
+            self.locals.pop();
+            self.emit_byte(OpCode::Pop);
         }
     }
 
@@ -144,11 +185,58 @@ impl Compiler<'_> {
 
     fn parse_variable(&mut self, msg: &str) -> String {
         self.consume(TokenType::Identifier, msg);
-        self.identifier_constant(&self.parser.previous)
+
+        self.declare_variable();
+        if self.scope_depth > 0 {
+            // todo - stop using this dummy value
+            "".to_string()
+        } else {
+            self.identifier_constant(&self.parser.previous)
+        }
     }
 
     fn define_variable(&mut self, global: String) -> () {
+        if self.scope_depth > 0 {
+            self.mark_initialized();
+            return ();
+        }
         self.emit_byte(OpCode::DefineGlobal(global));
+    }
+
+    fn mark_initialized(&mut self) -> () {
+        let len = self.locals.len();
+        self.locals[len - 1].initialized = true;
+    }
+
+    fn declare_variable(&mut self) -> () {
+        if self.scope_depth == 0 {
+            return;
+        }
+
+        let token = self.parser.previous.clone();
+        let locals = self.locals.clone();
+
+        for local in locals.iter().rev() {
+            if local.initialized && local.depth < self.scope_depth {
+                break;
+            } 
+
+            if local.name == token.lexeme {
+                self.error("Variable with this name already declared in this scope.");
+            }
+        }
+
+        self.add_local(token);
+    }
+
+    fn add_local(&mut self, token: Token) -> () {
+        let local = Local {
+            name: token.lexeme.clone(),
+            depth: self.scope_depth,
+            initialized: false,
+        };
+
+        self.locals.push(local);
     }
 
     fn identifier_constant(&self, token: &Token) -> String {
@@ -302,15 +390,38 @@ impl Compiler<'_> {
     }
 
     fn named_variable(&mut self, token: Token, can_assign: bool) -> () {
-        let arg = self.identifier_constant(&token);
+        let get_op;
+        let set_op;
         
+        if let Some(arg) = self.resolve_local(&token) {
+            set_op = OpCode::SetLocal(arg);
+            get_op = OpCode::GetLocal(arg);
+        } else {
+            let arg = self.identifier_constant(&token);
+            set_op = OpCode::SetGlobal(arg.clone());
+            get_op = OpCode::GetGlobal(arg.clone());
+        }
         // we'll check for setters vs getters
         if can_assign && self.match_token(TokenType::Equal) {
             self.expression();
-            self.emit_byte(OpCode::SetGlobal(arg));
+            self.emit_byte(set_op);
         } else {
-            self.emit_byte(OpCode::GetGlobal(arg));
+            self.emit_byte(get_op);
         }
+    }
+
+    fn resolve_local(&mut self, token: &Token) -> Option<usize> {
+        let locals = self.locals.clone();
+        for (idx, local) in locals.iter().enumerate().rev() {
+            if local.name == token.lexeme {
+                if !local.initialized {
+                    self.error("Cannot read local variable in its own initializer.");
+                }
+                return Some(idx);
+            } 
+        }
+
+        None
     }
 
     fn grouping(&mut self, _can_assign: bool) -> () {
