@@ -127,6 +127,12 @@ impl Compiler<'_> {
     fn statement(&mut self) -> () {
         if self.match_token(TokenType::Print) {
             self.print_statement();
+        } else if self.match_token(TokenType::For) {
+            self.for_statement();
+        } else if self.match_token(TokenType::If) {
+           self.if_statement(); 
+        } else if self.match_token(TokenType::While) {
+            self.while_statement();    
         } else if self.match_token(TokenType::LeftBrace) {
             // open brace means new block scope
             self.begin_scope();
@@ -156,6 +162,126 @@ impl Compiler<'_> {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
         self.emit_byte(OpCode::Print);
+    }
+
+    fn for_statement(&mut self) -> () {
+        // everything is locally scoped
+        self.begin_scope();
+        // we'll allow empty element in our clauses
+        self.consume(TokenType::LeftParen, "Expect '( after 'for'." );
+        if self.match_token(TokenType::Semicolon) {
+            // no initializer
+        } else if self.match_token(TokenType::Var) {
+            self.var_declaration();
+        } else {
+            // need to make sure anything evaluated is discarded from the stack
+            self.expression_statement();
+        }
+
+        let mut loop_start = self.compiling_chunk.code.len() - 1;
+
+        // how do we know if we can exit the loop?
+        // first we see if the next char is a semicolon
+        // if it is, we have something like for (x = 1;;)
+        // if it ISNT, there's a body inside like for (x = 1; x < 10;;)
+
+        let mut exit_jump: Option<usize> = None;
+        if !self.match_token(TokenType::Semicolon) {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after loop condition");
+            
+
+           exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse(0)));
+           self.emit_byte(OpCode::Pop); // pop condition
+        }
+        
+    
+        // if we haven't yet seen a right paren, the next thing must be the incrementor
+        if !self.match_token(TokenType::RightParen) {
+            // jump over the incrementor the first time, execute the body
+            // then jump BACK to the incrementor and reevaluate the condition
+            // http://www.craftinginterpreters.com/image/jumping-back-and-forth/for.png
+            let body_jump = self.emit_jump(OpCode::Jump(0));
+            let increment_start = self.compiling_chunk.code.len() - 1;
+        
+            self.expression();
+            self.emit_byte(OpCode::Pop);
+            self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+            self.emit_loop(loop_start);
+            loop_start = increment_start;
+
+            self.patch_jump(body_jump);
+        }
+        self.statement();
+        self.emit_loop(loop_start);
+        
+        // we jump to here in case we've finished the condition for looping
+        if let Some(jump) = exit_jump {
+            self.patch_jump(jump);
+            self.emit_byte(OpCode::Pop); // get the condition off stack
+        }
+        self.end_scope();
+    }
+
+    fn while_statement(&mut self) -> () {
+        // this tells our loop where to run back to re-evaluate expression
+        let loop_start = self.compiling_chunk.code.len() - 1;
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        // add a jump instruction to the end if while loop condition is false
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+        // if not false, clean up the jump
+        self.emit_byte(OpCode::Pop);
+        self.statement();
+
+        // since we didn't exit we need to go back up and figure out how to re-run the statement
+        self.emit_loop(loop_start);
+        self.patch_jump(exit_jump);
+        self.emit_byte(OpCode::Pop);
+    }
+
+    fn if_statement(&mut self) -> () {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        let then_jump_patch_idx = self.emit_jump(OpCode::JumpIfFalse(0)); // emit placeholder
+        self.emit_byte(OpCode::Pop);
+        self.statement();
+
+        // need the location of the end of the if consequence in order to else-patch
+        let else_jump_patch_idx = self.emit_jump(OpCode::Jump(0));
+        self.patch_jump(then_jump_patch_idx);
+        self.emit_byte(OpCode::Pop);
+
+        if self.match_token(TokenType::Else) {
+            self.statement();
+        }
+        self.patch_jump(else_jump_patch_idx);
+    }
+
+    fn emit_jump(&mut self, jump_op: OpCode) -> usize {
+       self.emit_byte(jump_op);
+       self.compiling_chunk.code.len() - 1
+    }
+
+    fn emit_loop(&mut self, loop_start: usize) -> () {
+        let loop_offset = self.compiling_chunk.code.len() - loop_start;
+        
+        self.emit_byte(OpCode::Loop(loop_offset));
+    }
+
+    fn patch_jump(&mut self, offset: usize) -> () {
+        let jump_length = self.compiling_chunk.code.len() - offset - 1;
+        let new_op = match self.compiling_chunk.code[offset].code {
+            OpCode::JumpIfFalse(0) => OpCode::JumpIfFalse(jump_length),
+            OpCode::Jump(0) => OpCode::Jump(jump_length),
+            _ => panic!("offset for patch_jump points to invalid instruction"),
+        };
+
+        self.compiling_chunk.code[offset].code = new_op;
     }
 
     fn var_declaration(&mut self) -> () {
@@ -463,6 +589,30 @@ impl Compiler<'_> {
         }
     }
 
+    fn and(&mut self, _can_assign: bool) -> () {
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+        self.emit_byte(OpCode::Pop);
+        self.parse_precedence(Precedence::And);
+
+        self.patch_jump(end_jump);
+    }
+
+    fn or(&mut self, _can_assign: bool) -> () {
+        // if the lefthand side is falsey, we need to parse and evaluate the righthand side
+        // so else jump says "hey, if the top of the stack is false basically just keep going"
+        // if the lefthand side is truthy, tthen it'll run into the end_jump jump which skips parsing the righthand side
+
+        let else_jump = self.emit_jump(OpCode::JumpIfFalse(0));
+        let end_jump = self.emit_jump(OpCode::Jump(0));
+
+        self.patch_jump(else_jump);
+        self.emit_byte(OpCode::Pop);
+
+        self.parse_precedence(Precedence::Or);
+
+        self.patch_jump(end_jump);
+    }
+
     fn expression(&mut self) -> () {
         self.parse_precedence(Precedence::Assignment);    
     }
@@ -547,7 +697,7 @@ const RULES : [ParseRule; 40] = [
     ParseRule::prefix(|compiler, can_assign| compiler.variable(can_assign), Precedence::None), //identifier
     ParseRule::prefix(|compiler, can_assign| compiler.string(can_assign), Precedence::None), //string
     ParseRule::prefix(|compiler, can_assign| compiler.number(can_assign), Precedence::None), // number
-    ParseRule::neither(), // and
+    ParseRule::infix(|compiler, _can_assign| compiler.and(_can_assign), Precedence::And), // and
     ParseRule::neither(), // class
     ParseRule::neither(), // else
     ParseRule::prefix(|compiler, can_assign| compiler.literal(can_assign), Precedence::None), // false
@@ -555,7 +705,7 @@ const RULES : [ParseRule; 40] = [
     ParseRule::neither(), // fun
     ParseRule::neither(), // if
     ParseRule::prefix(|compiler, can_assign| compiler.literal(can_assign), Precedence::None), // nil
-    ParseRule::neither(), // or
+    ParseRule::infix(|compiler, _can_assign| compiler.or(_can_assign), Precedence::Or), // or
     ParseRule::neither(), // print
     ParseRule::neither(), // return
     ParseRule::neither(), // super

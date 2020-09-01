@@ -17,3 +17,17 @@ var l = "outside scope";
 }
 
 print l;
+
+if (2 > 5) {
+  print "no hit";
+} else {
+  print "hit else branch";
+}
+
+if (2 < 5) {
+  print "Hit then branch";
+} else {
+  print "never hit";
+}
+
+

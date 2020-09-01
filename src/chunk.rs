@@ -9,6 +9,9 @@ pub enum OpCode {
     SetGlobal(String),
     SetLocal(usize),
     GetLocal(usize),
+    JumpIfFalse(usize),
+    Jump(usize),
+    Loop(usize),
     True,
     False,
     Pop,
@@ -29,12 +32,15 @@ pub enum OpCode {
 impl fmt::Display for OpCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            OpCode::Constant(val) => write!(f, "{}", val),
-            OpCode::DefineGlobal(val) => write!(f, "{}", val),
-            OpCode::GetGlobal(val) => write!(f, "{}", val),
-            OpCode::SetGlobal(val) => write!(f, "{}", val),
-            OpCode::GetLocal(val) => write!(f, "{}", val),
-            OpCode::SetLocal(val) => write!(f, "{}", val),
+            OpCode::Constant(val) => write!(f, "Constant {}", val),
+            OpCode::DefineGlobal(val) => write!(f, "DefineGlobal {}", val),
+            OpCode::GetGlobal(val) => write!(f, "GetGlobal {}", val),
+            OpCode::SetGlobal(val) => write!(f, "SetGlobal {}", val),
+            OpCode::GetLocal(val) => write!(f, "GetLocal {}", val),
+            OpCode::SetLocal(val) => write!(f, "SetLocal {}", val),
+            OpCode::JumpIfFalse(val) => write!(f, "JumpIfFalse: {}", val),
+            OpCode::Jump(val) => write!(f, "Jump: {}", val),
+            OpCode::Loop(val) => write!(f, "Loop: {}", val),
             OpCode::True => write!(f, "OpCode::True"),
             OpCode::False => write!(f, "OpCode::False"),
             OpCode::Pop => write!(f, "OpCode::Pop"),
@@ -49,7 +55,7 @@ impl fmt::Display for OpCode {
             OpCode::Equal => write!(f, "OpCode::Equal"),
             OpCode::Less => write!(f, "OpCode::Less"),
             OpCode::Greater => write!(f, "OpCode::Greater"),
-            OpCode::Print => write!(f, ""),
+            OpCode::Print => write!(f, "Print"),
         }
     }
 }
@@ -58,6 +64,12 @@ impl fmt::Display for OpCode {
 pub struct CodeLine {
     pub code: OpCode,
     pub line: i32,
+}
+
+impl fmt::Display for CodeLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ Code: {}, Line: {} }}", self.code, self.line)
+    }
 }
 
 #[derive(Clone)]

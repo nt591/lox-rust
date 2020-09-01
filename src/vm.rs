@@ -130,7 +130,23 @@ impl VM {
                 OpCode::SetLocal(val) => {
                     self.stack[val] = self.peek(0).clone();
                 }
+                
+                OpCode::JumpIfFalse(val) => {
+                    if Value::is_falsey(self.peek(0)) {
+                        self.ip += val
+                    };    
+                }
+                
+                OpCode::Jump(val) => {
+                    self.ip += val;
+                }
 
+                OpCode::Loop(val) => {
+                    self.ip -= val;
+                    /* for _ in 0..val {
+                        self.stack.pop();
+                    } */
+                }
                 // todo - consolidate with binary_operation
                 OpCode::Greater | OpCode::Less => {
                     match self.binary_comparison(&instruction) {
