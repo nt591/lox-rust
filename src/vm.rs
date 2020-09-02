@@ -9,6 +9,7 @@ pub struct VM {
     ip: usize,
     stack: Vec<Value>,
     globals: HashMap<String, Value>,
+    frames: Vec<CallFrame>,
 }
 
 pub enum InterpretResult {
@@ -17,32 +18,49 @@ pub enum InterpretResult {
     RuntimeError,
 }
 
+struct CallFrame {
+    function: usize, //idx of function
+    ip: usize,
+    slot_idx: usize, // where does the frame start?
+}
+
+const FRAME_MAX : usize = 64;
+const STACK_MAX : usize = 256; 
+
 impl VM {
     pub fn new() -> VM {
         VM {
             chunk: Chunk::new_chunk(),
             ip: 0, 
-            stack: Vec::new(),
+            stack: Vec::with_capacity(STACK_MAX),
             globals: HashMap::new(),
+            frames: Vec::with_capacity(FRAME_MAX),
         }
     }
 
     pub fn interpret(&mut self, source: &String) -> InterpretResult {
         self.chunk = Chunk::new_chunk();
         self.reset_stack(); // we need to reset pointer to start of char vector
-        let mut compiler = Compiler::new(&mut self.chunk);
+        let mut compiler = Compiler::new();
 
-        if !compiler.compile(&source) {
-            return InterpretResult::CompileError
+        match compiler.compile(&source) {
+            Err(_) => InterpretResult::CompileError,
+            Ok(_func) => self.run()
         }
-
-        self.run()
     }
     
+    fn top_frame(&mut self) -> &mut CallFrame {
+        match self.frames.len() {
+            0 => panic!("Frames should not be empty"),
+            len => &mut self.frames[len - 1],
+        }
+    }
+
     pub fn run(&mut self) -> InterpretResult {
         loop {
-            let ip = self.ip;
-            self.ip += 1;
+            let frame = self.top_frame(); 
+            let ip = frame.ip;
+            frame.ip += 1;
             // handle overflow
             if ip >= self.chunk.code.len() {
                 return InterpretResult::Ok

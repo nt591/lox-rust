@@ -1,6 +1,6 @@
 use crate::scanner::{Scanner, TokenType, Token};
 use crate::chunk::{Chunk, OpCode};
-use crate::value::Value;
+use crate::value::{Value, FunctionDef};
 
 struct Parser {
     current: Token,
@@ -70,27 +70,33 @@ struct Local {
     initialized: bool,
 }
 
-pub struct Compiler<'a> {
+pub struct Compiler {
+    functions: Vec<FunctionDef>,
     scanner: Scanner,
     parser: Parser,
-    compiling_chunk: &'a mut Chunk,
     
     scope_depth: usize,
     locals: Vec<Local>,
 }
 
-impl Compiler<'_> {
-    pub fn new(chunk: &mut Chunk) -> Compiler {
+impl Compiler {
+    pub fn new() -> Compiler {
         Compiler {
             scanner: Scanner::new(&"".to_string()),
             parser: Parser::new(),
-            compiling_chunk: chunk,
             locals: Vec::new(),
+            functions: Vec::new(),
             scope_depth: 0,
         }
     }
-
-    pub fn compile(&mut self,source: &String) -> bool {
+    
+    fn current_function(&mut self) -> &mut FunctionDef {
+        match self.functions.len() {
+            0 => panic!("Compiler functions vector should never be empty"),
+            len => &mut self.functions[len - 1]
+        }
+    }
+    pub fn compile(&mut self,source: &String) -> Result<FunctionDef, &str> {
         self.scanner = Scanner::new(&source);
         self.reset_error_state();
         self.advance();
@@ -98,9 +104,14 @@ impl Compiler<'_> {
         while !self.match_token(TokenType::EOF) {
             self.declaration();
         }
-        
-        self.end_compiler();
-        !self.parser.had_error
+        let errored = self.parser.had_error;
+        let function = self.end_compiler();
+
+        if errored {
+            Err("Compiler Error")
+        } else {
+            Ok(function.clone())
+        }
     }
 
     fn declaration(&mut self) -> () {
@@ -178,7 +189,7 @@ impl Compiler<'_> {
             self.expression_statement();
         }
 
-        let mut loop_start = self.compiling_chunk.code.len() - 1;
+        let mut loop_start = self.current_chunk().code.len() - 1;
 
         // how do we know if we can exit the loop?
         // first we see if the next char is a semicolon
@@ -202,7 +213,7 @@ impl Compiler<'_> {
             // then jump BACK to the incrementor and reevaluate the condition
             // http://www.craftinginterpreters.com/image/jumping-back-and-forth/for.png
             let body_jump = self.emit_jump(OpCode::Jump(0));
-            let increment_start = self.compiling_chunk.code.len() - 1;
+            let increment_start = self.current_chunk().code.len() - 1;
         
             self.expression();
             self.emit_byte(OpCode::Pop);
@@ -225,7 +236,7 @@ impl Compiler<'_> {
 
     fn while_statement(&mut self) -> () {
         // this tells our loop where to run back to re-evaluate expression
-        let loop_start = self.compiling_chunk.code.len() - 1;
+        let loop_start = self.current_chunk().code.len() - 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
@@ -264,24 +275,24 @@ impl Compiler<'_> {
 
     fn emit_jump(&mut self, jump_op: OpCode) -> usize {
        self.emit_byte(jump_op);
-       self.compiling_chunk.code.len() - 1
+       self.current_chunk().code.len() - 1
     }
 
     fn emit_loop(&mut self, loop_start: usize) -> () {
-        let loop_offset = self.compiling_chunk.code.len() - loop_start;
+        let loop_offset = self.current_chunk().code.len() - loop_start;
         
         self.emit_byte(OpCode::Loop(loop_offset));
     }
 
     fn patch_jump(&mut self, offset: usize) -> () {
-        let jump_length = self.compiling_chunk.code.len() - offset - 1;
-        let new_op = match self.compiling_chunk.code[offset].code {
+        let jump_length = self.current_chunk().code.len() - offset - 1;
+        let new_op = match self.current_chunk().code[offset].code {
             OpCode::JumpIfFalse(0) => OpCode::JumpIfFalse(jump_length),
             OpCode::Jump(0) => OpCode::Jump(jump_length),
             _ => panic!("offset for patch_jump points to invalid instruction"),
         };
 
-        self.compiling_chunk.code[offset].code = new_op;
+        self.current_chunk().code[offset].code = new_op;
     }
 
     fn var_declaration(&mut self) -> () {
@@ -449,7 +460,8 @@ impl Compiler<'_> {
     }
 
     fn emit_byte(&mut self, code: OpCode) -> () {
-        self.compiling_chunk.write(code, self.parser.previous.line);
+        let line = self.parser.previous.line;
+        self.current_chunk().write(code, line);
     }
 
     fn emit_bytes(&mut self, code1: OpCode, code2: OpCode) -> () {
@@ -457,12 +469,16 @@ impl Compiler<'_> {
         self.emit_byte(code2);
     }
 
-    //fn current_chunk(&self) -> Chunk {
-      //  self.compiling_chunk
-    //}
+    fn current_chunk(&mut self) -> &mut Chunk {
+        match self.functions.len() {
+            0 => panic!("compiler should never have an empty functions vector"),
+            len => &mut self.functions[len-1].chunk
+        }
+    }
 
-    fn end_compiler(&mut self) -> () {
+    fn end_compiler(&mut self) -> &mut FunctionDef {
         self.emit_return();
+        self.current_function()
     }
     
     fn get_rule(&self, op_type: TokenType) -> ParseRule {
